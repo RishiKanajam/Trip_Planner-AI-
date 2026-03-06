@@ -115,34 +115,34 @@ st.markdown("""
 <style>
     /* Plan My Trip submit button */
     div[data-testid="stFormSubmitButton"] > button {
-        background: white;
-        color: #e53935;
-        border: 2px solid #e53935;
+        background: #e53935;
+        color: white;
+        border: none;
         border-radius: 10px;
         font-weight: 700;
         font-size: 16px;
         padding: 0.6rem 1.2rem;
         width: 100%;
-        transition: background 0.2s, color 0.2s;
+        transition: opacity 0.2s;
     }
     div[data-testid="stFormSubmitButton"] > button:hover {
-        background: #e53935;
+        background: #c62828;
         color: white;
-        border: 2px solid #e53935;
+        border: none;
     }
     /* Sidebar convert button */
     div[data-testid="stButton"] > button {
-        background: white;
-        color: #e53935;
-        border: 2px solid #e53935;
+        background: #e53935;
+        color: white;
+        border: none;
         border-radius: 8px;
         font-weight: 600;
         width: 100%;
     }
     div[data-testid="stButton"] > button:hover {
-        background: #e53935;
+        background: #c62828;
         color: white;
-        border: 2px solid #e53935;
+        border: none;
     }
     /* Query textarea */
     .stTextArea > div > div > textarea {
