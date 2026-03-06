@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import time
 from dotenv import load_dotenv
@@ -31,6 +32,76 @@ start_fastapi_server()
 
 BASE_URL = "http://127.0.0.1:8000"
 
+# ── Destination → currency map ────────────────────────────────────────────────
+DESTINATION_CURRENCY = {
+    # Japan
+    "tokyo": "JPY", "osaka": "JPY", "kyoto": "JPY", "japan": "JPY",
+    # Eurozone
+    "paris": "EUR", "france": "EUR", "rome": "EUR", "italy": "EUR",
+    "barcelona": "EUR", "spain": "EUR", "berlin": "EUR", "germany": "EUR",
+    "amsterdam": "EUR", "netherlands": "EUR", "athens": "EUR", "greece": "EUR",
+    "lisbon": "EUR", "portugal": "EUR", "vienna": "EUR", "austria": "EUR",
+    "prague": "EUR", "budapest": "EUR",
+    # UK
+    "london": "GBP", "uk": "GBP", "england": "GBP", "scotland": "GBP",
+    # India
+    "goa": "INR", "india": "INR", "bangalore": "INR", "bengaluru": "INR",
+    "delhi": "INR", "mumbai": "INR", "coorg": "INR", "jaipur": "INR",
+    "kerala": "INR", "hyderabad": "INR", "kolkata": "INR", "chennai": "INR",
+    # UAE
+    "dubai": "AED", "uae": "AED", "abu dhabi": "AED",
+    # Thailand
+    "bangkok": "THB", "thailand": "THB", "phuket": "THB", "chiang mai": "THB",
+    # Singapore
+    "singapore": "SGD",
+    # Australia
+    "sydney": "AUD", "melbourne": "AUD", "australia": "AUD", "brisbane": "AUD",
+    # Canada
+    "toronto": "CAD", "vancouver": "CAD", "canada": "CAD",
+    # Malaysia
+    "kuala lumpur": "MYR", "malaysia": "MYR", "penang": "MYR",
+    # Switzerland
+    "zurich": "CHF", "switzerland": "CHF", "geneva": "CHF",
+    # Hong Kong
+    "hong kong": "HKD",
+    # New Zealand
+    "auckland": "NZD", "new zealand": "NZD",
+    # Sweden
+    "stockholm": "SEK", "sweden": "SEK",
+    # USA
+    "new york": "USD", "los angeles": "USD", "usa": "USD", "america": "USD",
+    "chicago": "USD", "miami": "USD", "las vegas": "USD", "san francisco": "USD",
+    # Brazil
+    "sao paulo": "BRL", "rio": "BRL", "brazil": "BRL",
+    # South Africa
+    "johannesburg": "ZAR", "cape town": "ZAR", "south africa": "ZAR",
+}
+
+def extract_destination(query: str):
+    """Extract the primary destination city/country from a trip query."""
+    patterns = [
+        r'\btrip\s+to\s+([A-Z][a-zA-Z ]+?)(?=\s+(?:for|in|with|on|during|from)|[,.]|$)',
+        r'\bto\s+([A-Z][a-zA-Z ]+?)(?=\s+(?:for|in|with|on|during|from)|[,.]|$)',
+        r'\bvisit(?:ing)?\s+([A-Z][a-zA-Z ]+?)(?=\s+(?:for|in|with|on|during)|[,.]|$)',
+        r'\bin\s+([A-Z][a-zA-Z ]+?)(?=\s+(?:for|with|on|during)|[,.]|$)',
+        r'\bfrom\s+\S+\s+to\s+([A-Z][a-zA-Z ]+?)(?=\s+(?:for|in|with)|[,.]|$)',
+    ]
+    skip = {"a", "an", "the", "my", "our", "your", "this", "that"}
+    for pattern in patterns:
+        m = re.search(pattern, query)
+        if m:
+            dest = m.group(1).strip()
+            if dest.lower() not in skip:
+                return dest
+    return None
+
+def get_dest_currency(destination: str):
+    d = destination.lower()
+    for key, curr in DESTINATION_CURRENCY.items():
+        if key in d:
+            return curr
+    return None
+
 # ── Page config ──────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="AI Trip Planner",
@@ -44,7 +115,7 @@ st.markdown("""
 <style>
     /* Plan My Trip submit button */
     div[data-testid="stFormSubmitButton"] > button {
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: #6c63ff;
         color: white;
         border: none;
         border-radius: 10px;
@@ -60,7 +131,7 @@ st.markdown("""
     }
     /* Sidebar convert button */
     div[data-testid="stButton"] > button {
-        background: linear-gradient(135deg, #11998e, #38ef7d);
+        background: #11998e;
         color: white;
         border: none;
         border-radius: 8px;
@@ -98,6 +169,13 @@ CURRENCIES = [
     "USD", "EUR", "GBP", "INR", "JPY", "AUD", "CAD", "SGD",
     "AED", "THB", "MYR", "CHF", "HKD", "NZD", "SEK", "BRL", "ZAR",
 ]
+
+# ── Session state init ───────────────────────────────────────────────────────────
+if "pending_query" not in st.session_state:
+    st.session_state.pending_query = ""
+if "to_curr_idx" not in st.session_state:
+    st.session_state.to_curr_idx = 3  # INR default
+# weather_city is managed by the text_input key="weather_city"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=600)
@@ -193,7 +271,7 @@ with st.sidebar:
     amount    = st.number_input("Amount", min_value=0.01, value=100.0, step=50.0, label_visibility="collapsed")
     col_f, col_t = st.columns(2)
     from_curr = col_f.selectbox("From", CURRENCIES, index=0)
-    to_curr   = col_t.selectbox("To",   CURRENCIES, index=3)  # INR default
+    to_curr   = col_t.selectbox("To",   CURRENCIES, index=st.session_state.to_curr_idx)
 
     if st.button("Convert", use_container_width=True):
         if not EXCHANGE_API_KEY:
@@ -238,13 +316,31 @@ with st.expander("Need inspiration? Try these examples"):
 - *Budget backpacking trip across Southeast Asia for 3 weeks*
 """)
 
-# ── Result ────────────────────────────────────────────────────────────────────────
+# When submitted: extract destination, sync sidebar widgets, then rerun so the
+# sidebar reflects the new city/currency before the API call executes.
 if submitted and user_input.strip():
+    dest = extract_destination(user_input)
+    if dest:
+        st.session_state.weather_city = dest
+        curr = get_dest_currency(dest)
+        if curr and curr in CURRENCIES:
+            st.session_state.to_curr_idx = CURRENCIES.index(curr)
+    st.session_state.pending_query = user_input
+    st.rerun()
+
+elif submitted:
+    st.warning("Please describe your trip before submitting.")
+
+# ── Result ────────────────────────────────────────────────────────────────────────
+if st.session_state.pending_query:
+    query_to_run = st.session_state.pending_query
+    st.session_state.pending_query = ""
+
     with st.spinner("Your AI travel agent is researching your trip — this may take a minute..."):
         try:
             response = requests.post(
                 f"{BASE_URL}/query",
-                json={"question": user_input},
+                json={"question": query_to_run},
                 timeout=180,
             )
         except requests.exceptions.Timeout:
@@ -279,6 +375,3 @@ if submitted and user_input.strip():
         )
     else:
         st.error("The agent failed to respond. " + response.text)
-
-elif submitted:
-    st.warning("Please describe your trip before submitting.")
