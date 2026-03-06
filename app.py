@@ -115,32 +115,34 @@ st.markdown("""
 <style>
     /* Plan My Trip submit button */
     div[data-testid="stFormSubmitButton"] > button {
-        background: #6c63ff;
-        color: white;
-        border: none;
+        background: white;
+        color: #e53935;
+        border: 2px solid #e53935;
         border-radius: 10px;
         font-weight: 700;
         font-size: 16px;
         padding: 0.6rem 1.2rem;
         width: 100%;
-        transition: opacity 0.2s;
+        transition: background 0.2s, color 0.2s;
     }
     div[data-testid="stFormSubmitButton"] > button:hover {
-        opacity: 0.88;
-        border: none;
+        background: #e53935;
+        color: white;
+        border: 2px solid #e53935;
     }
     /* Sidebar convert button */
     div[data-testid="stButton"] > button {
-        background: #11998e;
-        color: white;
-        border: none;
+        background: white;
+        color: #e53935;
+        border: 2px solid #e53935;
         border-radius: 8px;
         font-weight: 600;
         width: 100%;
     }
     div[data-testid="stButton"] > button:hover {
-        opacity: 0.88;
-        border: none;
+        background: #e53935;
+        color: white;
+        border: 2px solid #e53935;
     }
     /* Query textarea */
     .stTextArea > div > div > textarea {
@@ -175,7 +177,10 @@ if "pending_query" not in st.session_state:
     st.session_state.pending_query = ""
 if "to_curr_idx" not in st.session_state:
     st.session_state.to_curr_idx = 3  # INR default
-# weather_city is managed by the text_input key="weather_city"
+
+# Apply auto-city BEFORE any widget renders (widget keys can't be set after render)
+if "_pending_city" in st.session_state:
+    st.session_state.weather_city = st.session_state.pop("_pending_city")
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=600)
@@ -321,7 +326,8 @@ with st.expander("Need inspiration? Try these examples"):
 if submitted and user_input.strip():
     dest = extract_destination(user_input)
     if dest:
-        st.session_state.weather_city = dest
+        # Use _pending_city flag — gets applied at top of NEXT rerun, before sidebar renders
+        st.session_state._pending_city = dest
         curr = get_dest_currency(dest)
         if curr and curr in CURRENCIES:
             st.session_state.to_curr_idx = CURRENCIES.index(curr)
